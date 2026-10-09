@@ -196,6 +196,25 @@ function filterShopping(name, items, opts = {}) {
   else summary = total ? `Havia ${total} anúncios, mas nenhum de loja confiável ou com boa avaliação.` : "Nenhum anúncio relevante no Google Shopping.";
   return { offers, summary };
 }
+const STORE_DOMAINS = { kabum: "kabum.com.br", pichau: "pichau.com.br", terabyte: "terabyteshop.com.br", amazon: "amazon.com.br",
+  mercadolivre: "mercadolivre.com.br", magazineluiza: "magazineluiza.com.br", magalu: "magazineluiza.com.br", americanas: "americanas.com.br",
+  submarino: "submarino.com.br", shoptime: "shoptime.com.br", casasbahia: "casasbahia.com.br", ponto: "pontofrio.com.br",
+  carrefour: "carrefour.com.br", fastshop: "fastshop.com.br", girafa: "girafa.com.br", kalunga: "kalunga.com.br", samsung: "samsung.com",
+  dell: "dell.com", lenovo: "lenovo.com", lg: "lg.com", apple: "apple.com", havan: "havan.com.br", leroymerlin: "leroymerlin.com.br",
+  decathlon: "decathlon.com.br", netshoes: "netshoes.com.br", centauro: "centauro.com.br" };
+function storeDomain(store) { const n = squash(store), k = Object.keys(STORE_DOMAINS).find((x) => n.startsWith(x)); return k ? STORE_DOMAINS[k] : null; }
+function pickDirect(organic, store, domain) {
+  const n = squash(store);
+  for (const r of organic || []) {
+    let u; try { u = new URL(r.link); } catch { continue; }
+    if (!/^https?:$/.test(u.protocol) || /\/(busca|search|categoria)\b|[?&]q=/i.test(u.pathname + u.search)) continue;
+    const host = u.hostname.replace(/^www\./, "");
+    if (domain) { if (host === domain || host.endsWith("." + domain)) return r.link; continue; }
+    const label = squash(host.split(".")[0]);
+    if (label.length >= 3 && (n.startsWith(label) || label.startsWith(n))) return r.link;
+  }
+  return null;
+}
 // </pure>
 
 // ---- armazenamento local (por navegador) ----
@@ -226,6 +245,34 @@ async function serperSearch(name) {
   const data = await res.json();
   return filterShopping(name, data.shopping, { trusted: settings.trustedOnly ? settings.trusted : null, minRating: settings.minRating, requireRating: settings.requireRating });
 }
+
+const isGoogle = (u) => { try { return /(^|\.)google\./.test(new URL(u).hostname); } catch { return false; } };
+async function resolveDirect(o) {
+  const domain = storeDomain(o.store);
+  const res = await fetch("https://google.serper.dev/search", { method: "POST",
+    headers: { "X-API-KEY": settings.key, "Content-Type": "application/json" },
+    body: JSON.stringify({ q: domain ? `site:${domain} ${o.title}` : `${o.title} ${o.store}`, gl: "br", hl: "pt-br", num: 10 }) });
+  if (!res.ok) throw new Error("Serper " + res.status);
+  return pickDirect((await res.json()).organic, o.store, domain);
+}
+
+// Ao clicar numa oferta, troca o link do Google Shopping pelo link direto da loja (1 busca extra, 1x por oferta).
+document.addEventListener("click", async (e) => {
+  const a = e.target.closest("a[data-pid]");
+  if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || !settings.key) return;
+  const offers = a.dataset.pid === "search" ? lastSearch?.r.offers : deals[a.dataset.pid]?.offers;
+  const o = offers?.[+a.dataset.oi];
+  if (!o || o.direct || o.directTried || !isGoogle(o.url)) return;   // já é direto ou já resolvido: segue o link normal
+  e.preventDefault();
+  const w = window.open("", "_blank"); if (w) w.opener = null;
+  let url = null;
+  try { url = await resolveDirect(o); } catch { /* usa o link do Google */ }
+  o.directTried = true; if (url) { o.direct = url; a.href = url; }
+  if (a.dataset.pid !== "search") store.set("cp_deals", deals);
+  const target = url || o.url;
+  if (w) w.location = target;
+  else toast(url ? "Link direto pronto, clique de novo." : "Não achei o link direto da loja.");
+});
 
 function applyResult(id, r) {
   const e = deals[id] || { history: [] };
@@ -270,12 +317,13 @@ function spark(hist) {
 }
 
 const rate = (o) => (o.rating ? ` · ★ ${String(o.rating).replace(".", ",")}${o.ratingCount ? ` (${o.ratingCount})` : ""}` : "");
-function offersHtml(best, offers, open) {
-  return `<div><a href="${safeUrl(best.url)}" target="_blank" rel="noopener noreferrer">${esc(best.title || "Ver oferta")}</a>
+const lnk = (o, pid, i) => `href="${safeUrl(o.direct || o.url)}" data-pid="${esc(pid)}" data-oi="${i}" target="_blank" rel="noopener noreferrer"`;
+function offersHtml(best, offers, open, pid) {
+  return `<div><a ${lnk(best, pid, 0)}>${esc(best.title || "Ver oferta")}</a>
       <span class="store">· ${esc(best.store)}${esc(rate(best))}</span></div>
     ${best.shipping || best.note ? `<div class="sub">${esc([best.shipping, best.note].filter(Boolean).join(" · "))}</div>` : ""}
-    ${offers.length > 1 ? `<details ${open ? "open" : ""}><summary>Outras ofertas (${offers.length - 1})</summary><table>${offers.slice(1).map((o) =>
-      `<tr><td><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.store)}</a><div class="sub">${esc(o.title)}${esc(rate(o))}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}`;
+    ${offers.length > 1 ? `<details ${open ? "open" : ""}><summary>Outras ofertas (${offers.length - 1})</summary><table>${offers.slice(1).map((o, i) =>
+      `<tr><td><a ${lnk(o, pid, i + 1)}>${esc(o.store)}</a><div class="sub">${esc(o.title)}${esc(rate(o))}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}`;
 }
 
 function render() {
@@ -297,7 +345,7 @@ function render() {
       body = `<div class="best"><span class="price">${brl(best.price)}</span>
           ${hit ? '<span class="badge">Abaixo do alvo</span>' : ""}${lowest ? '<span class="badge">Menor preço do histórico</span>' : ""}
           ${delta ? `<span class="sub">${delta < 0 ? "▼" : "▲"} ${brl(Math.abs(delta))} vs. busca anterior</span>` : ""}</div>
-        ${offersHtml(best, offers, false)}${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}
+        ${offersHtml(best, offers, false, p.id)}${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}
         ${d.error ? `<div class="err">Última tentativa falhou: ${esc(d.error)}</div>` : ""}`;
     }
     return `<article class="card">
@@ -382,7 +430,7 @@ function showResult(q, r) {
   box.innerHTML = `<article class="card">
     <div class="name">${esc(q)}</div>
     <div class="best"><span class="price">${brl(best.price)}</span><span class="badge">Menor preço encontrado</span></div>
-    ${offersHtml(best, offers, true)}${r.summary ? `<div class="summary">${esc(r.summary)}</div>` : ""}
+    ${offersHtml(best, offers, true, "search")}${r.summary ? `<div class="summary">${esc(r.summary)}</div>` : ""}
     <div class="meta"><span>Pesquisado agora</span>
       <button id="btnTrack" ${tracked ? "disabled" : ""}>${tracked ? "Já acompanhando" : "+ Acompanhar"}</button></div>
   </article>`;
