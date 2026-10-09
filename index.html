@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caça-Promo</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #14181f; --muted: #667085; --line: #e4e7ec;
+    --accent: #2563eb; --good: #087443; --good-bg: #dcfae6; --warn: #b54708; --danger: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1216; --card: #181c22; --text: #eceff3; --muted: #98a2b3; --line: #2a303a;
+            --accent: #6ea0ff; --good: #75e0a7; --good-bg: #0b3a24; --warn: #fdb022; --danger: #f97066; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  .sub { color: var(--muted); font-size: .85rem; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { border: 1px solid var(--line); background: var(--card); padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.link { border: 0; background: none; color: var(--muted); padding: 4px; font-size: .85rem; }
+  button.link:hover { color: var(--danger); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .name { font-weight: 600; font-size: 1.05rem; }
+  .notes { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+  .best { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .price { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .badge { font-size: .75rem; padding: 2px 8px; border-radius: 99px; background: var(--good-bg); color: var(--good); font-weight: 600; }
+  .store { color: var(--muted); }
+  a { color: var(--accent); }
+  .summary { font-size: .9rem; color: var(--muted); margin: 6px 0; }
+  details { margin-top: 8px; font-size: .9rem; }
+  summary { cursor: pointer; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+  td.p { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .meta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: .8rem; color: var(--muted); }
+  .err { color: var(--danger); font-size: .85rem; }
+  .spark { color: var(--accent); }
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+  .tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 14px; color: var(--muted); }
+  .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  .sform { display: flex; gap: 8px; margin-bottom: 14px; }
+  .sform input { flex: 1; }
+  button:disabled { opacity: .6; cursor: default; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+          border-radius: 50%; animation: sp 1s linear infinite; vertical-align: -2px; margin-right: 8px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  [hidden] { display: none !important; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); width: min(460px, 92vw); padding: 18px; }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  input, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+  .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+           padding: 8px 14px; border-radius: 8px; font-size: .9rem; display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Caça-Promo</h1>
+      <div class="sub" id="status">Carregando…</div>
+    </div>
+    <div>
+      <button id="btnCfg" title="Conexão com o GitHub">⚙︎</button>
+      <button id="btnAdd" class="primary">+ Produto</button>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="watch" aria-selected="true">Acompanhando</button>
+    <button class="tab" role="tab" data-tab="search" aria-selected="false">Pesquisar</button>
+  </nav>
+  <div id="list"></div>
+  <section id="pane-search" hidden>
+    <form class="sform" id="formSearch">
+      <input id="sQuery" required maxlength="200" placeholder="Nome do produto, ex.: Ryzen 7 7800X3D" aria-label="Produto a pesquisar">
+      <button class="primary" id="sBtn" type="submit">Pesquisar</button>
+    </form>
+    <div id="sResult"></div>
+  </section>
+</main>
+
+<dialog id="dlgAdd">
+  <form method="dialog" id="formAdd">
+    <strong>Novo produto</strong>
+    <label for="fName">Nome</label>
+    <input id="fName" required maxlength="120" placeholder="Ex.: Placa de vídeo RTX 5060 8GB">
+    <label for="fNotes">Requisitos (opcional)</label>
+    <textarea id="fNotes" rows="3" maxlength="300" placeholder="Modelo, specs mínimas, marcas aceitas…"></textarea>
+    <label for="fTarget">Preço-alvo em R$ (opcional)</label>
+    <input id="fTarget" type="number" min="0" step="0.01" inputmode="decimal">
+    <div class="actions">
+      <button type="button" id="addCancel">Cancelar</button>
+      <button class="primary" type="submit">Adicionar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgCfg">
+  <form method="dialog" id="formCfg">
+    <strong>Conexão com o GitHub</strong>
+    <p class="sub">Necessária só para adicionar/remover produtos pelo site. Fica salva apenas neste navegador.</p>
+    <label for="cOwner">Usuário do GitHub</label>
+    <input id="cOwner" required>
+    <label for="cRepo">Repositório</label>
+    <input id="cRepo" required>
+    <label for="cToken">Token (fine-grained, permissão Contents: read/write só neste repo)</label>
+    <input id="cToken" type="password" autocomplete="off" required>
+    <div class="actions">
+      <button type="button" id="cfgCancel">Cancelar</button>
+      <button class="primary" type="submit">Salvar</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const brl = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const safeUrl = (u) => (/^https?:\/\//i.test(u) ? esc(u) : "#");
+const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("/") : "—");
+
+let products = [], deals = {};
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = "none"), 3500);
+}
+
+async function load() {
+  const bust = "?t=" + Date.now();
+  try {
+    products = await (await fetch("products.json" + bust)).json();
+    deals = await (await fetch("data/deals.json" + bust)).json().catch(() => ({}));
+  } catch (e) { $("#status").textContent = "Erro ao carregar dados."; return; }
+  render();
+}
+
+function spark(hist) {
+  if (!hist || hist.length < 2) return "";
+  const w = 120, h = 32, ps = hist.map((x) => x.p), min = Math.min(...ps), max = Math.max(...ps), rng = max - min || 1;
+  const pts = ps.map((p, i) => `${(i / (ps.length - 1)) * w},${h - 3 - ((p - min) / rng) * (h - 6)}`).join(" ");
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Histórico do menor preço, ${hist.length} dias">
+    <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+function render() {
+  const list = $("#list");
+  const dates = Object.values(deals).map((d) => d.updated).filter(Boolean).sort();
+  $("#status").textContent = dates.length ? "Última busca: " + fmtDate(dates[dates.length - 1]) : "Nenhuma busca feita ainda";
+  if (!products.length) { list.innerHTML = '<div class="empty">Nenhum produto. Clique em “+ Produto”.</div>'; return; }
+  list.innerHTML = products.map((p) => {
+    const d = deals[p.id] || {}, offers = d.offers || [], best = offers[0];
+    const hist = d.history || [], prev = hist.length > 1 ? hist[hist.length - 2].p : null;
+    const hit = best && p.target_price && best.price <= p.target_price;
+    const lowest = best && hist.length > 1 && best.price <= Math.min(...hist.map((h) => h.p));
+    let body;
+    if (d.error && !best) body = `<div class="err">Falha na última busca: ${esc(d.error)}</div>`;
+    else if (!d.updated) body = '<div class="summary">Aguardando a primeira busca (roda todo dia automaticamente).</div>';
+    else if (!best) body = '<div class="summary">Nenhuma oferta confiável encontrada hoje.</div>';
+    else {
+      const delta = prev ? best.price - prev : 0;
+      body = `<div class="best">
+          <span class="price">${brl(best.price)}</span>
+          ${hit ? '<span class="badge">Abaixo do alvo</span>' : ""}
+          ${lowest ? '<span class="badge">Menor preço do histórico</span>' : ""}
+          ${delta ? `<span class="sub">${delta < 0 ? "▼" : "▲"} ${brl(Math.abs(delta))} vs. busca anterior</span>` : ""}
+        </div>
+        <div><a href="${safeUrl(best.url)}" target="_blank" rel="noopener noreferrer">${esc(best.title || "Ver oferta")}</a>
+          <span class="store">· ${esc(best.store)}${best.condition && best.condition !== "novo" ? " · " + esc(best.condition) : ""}</span></div>
+        ${best.shipping || best.note ? `<div class="sub">${esc([best.shipping, best.note].filter(Boolean).join(" · "))}</div>` : ""}
+        ${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}
+        ${offers.length > 1 ? `<details><summary>Outras ofertas (${offers.length - 1})</summary><table>${offers.slice(1).map((o) =>
+          `<tr><td><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.store)}</a><div class="sub">${esc(o.title)}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}`;
+    }
+    return `<article class="card">
+      <div class="row"><div><div class="name">${esc(p.name)}</div>${p.notes ? `<div class="notes">${esc(p.notes)}</div>` : ""}</div>${spark(hist)}</div>
+      ${body}
+      <div class="meta"><span>${p.target_price ? "Alvo: " + brl(p.target_price) : "Sem preço-alvo"} · Atualizado: ${fmtDate(d.updated)}</span>
+        <button class="link" data-del="${esc(p.id)}">Remover</button></div>
+    </article>`;
+  }).join("");
+}
+
+// ---- GitHub: grava products.json no repositório ----
+const cfg = () => { try { return JSON.parse(localStorage.getItem("ghcfg")) || null; } catch { return null; } };
+const b64 = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+
+async function saveProducts(next, message) {
+  const c = cfg();
+  if (!c) { $("#dlgCfg").showModal(); throw new Error("Configure o GitHub primeiro (botão ⚙︎)."); }
+  const url = `https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/contents/products.json`;
+  const headers = { Authorization: `Bearer ${c.token}`, Accept: "application/vnd.github+json" };
+  const cur = await fetch(url, { headers });
+  if (!cur.ok) throw new Error("Não consegui ler o repositório (" + cur.status + "). Confira o token.");
+  const { sha } = await cur.json();
+  const res = await fetch(url, { method: "PUT", headers,
+    body: JSON.stringify({ message, sha, content: b64(JSON.stringify(next, null, 2) + "\n") }) });
+  if (!res.ok) throw new Error("Falha ao salvar (" + res.status + ").");
+  products = next; render();
+}
+
+$("#btnAdd").onclick = () => $("#dlgAdd").showModal();
+$("#addCancel").onclick = () => $("#dlgAdd").close();
+$("#btnCfg").onclick = () => {
+  const c = cfg() || {};
+  $("#cOwner").value = c.owner || ""; $("#cRepo").value = c.repo || ""; $("#cToken").value = c.token || "";
+  $("#dlgCfg").showModal();
+};
+$("#cfgCancel").onclick = () => $("#dlgCfg").close();
+$("#formCfg").onsubmit = () => {
+  localStorage.setItem("ghcfg", JSON.stringify({ owner: $("#cOwner").value.trim(), repo: $("#cRepo").value.trim(), token: $("#cToken").value.trim() }));
+  toast("Conexão salva neste navegador.");
+};
+$("#formAdd").onsubmit = async () => {
+  const name = $("#fName").value.trim();
+  const target = parseFloat($("#fTarget").value);
+  const p = { id: name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) + "-" + Date.now().toString(36),
+              name, notes: $("#fNotes").value.trim() || undefined, target_price: target > 0 ? target : undefined };
+  try { await saveProducts([...products, p], "Adiciona produto: " + name); toast("Adicionado. A busca roda em alguns minutos."); $("#formAdd").reset(); }
+  catch (e) { toast(e.message); }
+};
+$("#list").onclick = async (e) => {
+  const id = e.target.dataset?.del; if (!id) return;
+  const p = products.find((x) => x.id === id);
+  if (!confirm(`Remover “${p.name}”?`)) return;
+  try { await saveProducts(products.filter((x) => x.id !== id), "Remove produto: " + p.name); toast("Removido."); }
+  catch (err) { toast(err.message); }
+};
+
+// ---- Aba Pesquisar (pesquisa sob demanda via GitHub Actions) ----
+function showTab(name) {
+  document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", t.dataset.tab === name));
+  $("#list").hidden = name !== "watch";
+  $("#pane-search").hidden = name !== "search";
+}
+document.querySelector(".tabs").onclick = (e) => { const t = e.target.dataset?.tab; if (t) showTab(t); };
+
+const ghHeaders = (c, accept = "application/vnd.github+json") => ({ Authorization: `Bearer ${c.token}`, Accept: accept });
+const repoApi = (c) => `https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}`;
+let pollTimer = null, lastSearch = null;
+
+function showResult(d) {
+  $("#sBtn").disabled = false;
+  const box = $("#sResult");
+  if (d.status === "error") { box.innerHTML = `<div class="card err">A pesquisa falhou: ${esc(d.error)}</div>`; return; }
+  const offers = d.offers || [], best = offers[0];
+  if (!best) { box.innerHTML = `<div class="card">Nenhuma oferta confiável encontrada para “${esc(d.query)}”.${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}</div>`; return; }
+  lastSearch = d;
+  const tracked = products.some((p) => p.name.toLowerCase() === d.query.toLowerCase());
+  box.innerHTML = `<article class="card">
+    <div class="name">${esc(d.query)}</div>
+    <div class="best"><span class="price">${brl(best.price)}</span><span class="badge">Menor preço encontrado</span></div>
+    <div><a href="${safeUrl(best.url)}" target="_blank" rel="noopener noreferrer">${esc(best.title || "Ver oferta")}</a>
+      <span class="store">· ${esc(best.store)}${best.condition && best.condition !== "novo" ? " · " + esc(best.condition) : ""}</span></div>
+    ${best.shipping || best.note ? `<div class="sub">${esc([best.shipping, best.note].filter(Boolean).join(" · "))}</div>` : ""}
+    ${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}
+    ${offers.length > 1 ? `<details open><summary>Outras ofertas (${offers.length - 1})</summary><table>${offers.slice(1).map((o) =>
+      `<tr><td><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.store)}</a><div class="sub">${esc(o.title)}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}
+    <div class="meta"><span>Pesquisado em ${fmtDate(d.date)}</span>
+      <button id="btnTrack" ${tracked ? "disabled" : ""}>${tracked ? "Já acompanhando" : "+ Acompanhar todo dia"}</button></div>
+  </article>`;
+}
+
+async function runSearch(q) {
+  const c = cfg(), box = $("#sResult");
+  if (!c) { $("#dlgCfg").showModal(); toast("Configure o GitHub primeiro (botão ⚙︎)."); return; }
+  clearTimeout(pollTimer);
+  const id = Date.now().toString(36), btn = $("#sBtn");
+  btn.disabled = true;
+  box.innerHTML = `<div class="card"><span class="spin"></span>Pesquisando “${esc(q)}”… leva de 1 a 3 minutos.</div>`;
+  const fail = (msg) => { btn.disabled = false; box.innerHTML = `<div class="card err">${esc(msg)}</div>`; };
+  try {
+    const repoRes = await fetch(repoApi(c), { headers: ghHeaders(c) });
+    if (!repoRes.ok) return fail("Não consegui acessar o repositório (" + repoRes.status + "). Confira ⚙︎.");
+    const { default_branch } = await repoRes.json();
+    const disp = await fetch(`${repoApi(c)}/actions/workflows/search.yml/dispatches`, {
+      method: "POST", headers: ghHeaders(c),
+      body: JSON.stringify({ ref: default_branch, inputs: { query: q, request_id: id } }) });
+    if (!disp.ok) return fail(disp.status === 403 || disp.status === 404
+      ? "O token precisa da permissão Actions: Read and write neste repositório (e o arquivo search.yml precisa estar no GitHub)."
+      : "Não consegui iniciar a pesquisa (" + disp.status + ").");
+  } catch { return fail("Sem conexão com o GitHub."); }
+
+  const t0 = Date.now();
+  const poll = async () => {
+    try {
+      const r = await fetch(`${repoApi(c)}/contents/data/search.json?t=${Date.now()}`, { headers: ghHeaders(c, "application/vnd.github.raw+json") });
+      if (r.ok) { const d = await r.json(); if (d.id === id) return showResult(d); }
+    } catch { /* tenta de novo */ }
+    if (Date.now() - t0 > 5 * 60000) return fail("Demorou demais. Veja a aba Actions do repositório para o motivo.");
+    pollTimer = setTimeout(poll, 8000);
+  };
+  pollTimer = setTimeout(poll, 20000);
+}
+
+$("#formSearch").onsubmit = (e) => { e.preventDefault(); runSearch($("#sQuery").value.trim()); };
+$("#sResult").onclick = async (e) => {
+  if (e.target.id !== "btnTrack" || !lastSearch) return;
+  const name = lastSearch.query;
+  const id = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) + "-" + Date.now().toString(36);
+  try { await saveProducts([...products, { id, name }], "Adiciona produto: " + name); toast("Adicionado à lista."); e.target.textContent = "Já acompanhando"; e.target.disabled = true; }
+  catch (err) { toast(err.message); }
+};
+
+load();
+</script>
+</body>
+</html>
