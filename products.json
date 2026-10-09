@@ -1,14 +1,1 @@
-[
-  {
-    "id": "exemplo-ssd-nvme-1tb",
-    "name": "SSD NVMe 1TB",
-    "notes": "PCIe 4.0, mínimo 5000 MB/s de leitura, de marca conhecida (WD, Kingston, Crucial, Samsung)",
-    "target_price": 400
-  },
-  {
-    "id": "exemplo-memoria-ddr5-32gb",
-    "name": "Memória RAM DDR5 32GB (2x16GB) 6000MHz",
-    "notes": "Kit dual channel, CL30 ou CL32",
-    "target_price": 700
-  }
-]
+[]

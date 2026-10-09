@@ -17,14 +17,17 @@
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
   h1 { font-size: 1.4rem; margin: 0; }
   .sub { color: var(--muted); font-size: .85rem; }
+  .toolbar { display: flex; gap: 8px; }
   button, input, textarea { font: inherit; color: inherit; }
   button { border: 1px solid var(--line); background: var(--card); padding: 8px 12px; border-radius: 8px; cursor: pointer; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.link { border: 0; background: none; color: var(--muted); padding: 4px; font-size: .85rem; }
-  button.link:hover { color: var(--danger); }
+  button.link { border: 0; background: none; color: var(--muted); padding: 4px 6px; font-size: .85rem; }
+  button.link:hover { color: var(--accent); }
+  button.link.del:hover { color: var(--danger); }
+  button:disabled { opacity: .6; cursor: default; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
   .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .name { font-weight: 600; font-size: 1.05rem; }
@@ -40,7 +43,7 @@
   table { width: 100%; border-collapse: collapse; margin-top: 6px; }
   td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
   td.p { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .meta { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: .8rem; color: var(--muted); }
+  .meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; font-size: .8rem; color: var(--muted); flex-wrap: wrap; }
   .err { color: var(--danger); font-size: .85rem; }
   .spark { color: var(--accent); }
   .tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
@@ -48,7 +51,6 @@
   .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
   .sform { display: flex; gap: 8px; margin-bottom: 14px; }
   .sform input { flex: 1; }
-  button:disabled { opacity: .6; cursor: default; }
   .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
           border-radius: 50%; animation: sp 1s linear infinite; vertical-align: -2px; margin-right: 8px; }
   @keyframes sp { to { transform: rotate(360deg); } }
@@ -56,11 +58,14 @@
   dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); width: min(460px, 92vw); padding: 18px; }
   dialog::backdrop { background: rgba(0,0,0,.5); }
   label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  label.check { display: flex; gap: 8px; align-items: center; color: var(--text); }
+  label.check input { width: auto; }
   input, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .inline { display: flex; gap: 8px; margin-top: 8px; }
   .empty { text-align: center; color: var(--muted); padding: 40px 0; }
   #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
-           padding: 8px 14px; border-radius: 8px; font-size: .9rem; display: none; }
+           padding: 8px 14px; border-radius: 8px; font-size: .9rem; display: none; max-width: 90vw; }
 </style>
 </head>
 <body>
@@ -70,9 +75,10 @@
       <h1>Caça-Promo</h1>
       <div class="sub" id="status">Carregando…</div>
     </div>
-    <div>
-      <button id="btnCfg" title="Conexão com o GitHub">⚙︎</button>
-      <button id="btnAdd" class="primary">+ Produto</button>
+    <div class="toolbar">
+      <button id="btnCfg" title="Configurações" aria-label="Configurações">⚙︎</button>
+      <button id="btnAdd">+ Produto</button>
+      <button id="btnRun" class="primary">Buscar tudo agora</button>
     </div>
   </header>
   <nav class="tabs" role="tablist">
@@ -92,29 +98,32 @@
 <dialog id="dlgAdd">
   <form method="dialog" id="formAdd">
     <strong>Novo produto</strong>
-    <label for="fName">Nome</label>
-    <input id="fName" required maxlength="120" placeholder="Ex.: Placa de vídeo RTX 5060 8GB">
-    <label for="fNotes">Requisitos (opcional)</label>
-    <textarea id="fNotes" rows="3" maxlength="300" placeholder="Modelo, specs mínimas, marcas aceitas…"></textarea>
+    <label for="fName">Nome (quanto mais específico, melhor)</label>
+    <input id="fName" required maxlength="120" placeholder="Ex.: SSD Kingston NV3 1TB NVMe">
+    <label for="fNotes">Observações (opcional)</label>
+    <textarea id="fNotes" rows="2" maxlength="300" placeholder="Só para você lembrar"></textarea>
     <label for="fTarget">Preço-alvo em R$ (opcional)</label>
     <input id="fTarget" type="number" min="0" step="0.01" inputmode="decimal">
     <div class="actions">
       <button type="button" id="addCancel">Cancelar</button>
-      <button class="primary" type="submit">Adicionar</button>
+      <button class="primary" type="submit">Adicionar e buscar</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="dlgCfg">
   <form method="dialog" id="formCfg">
-    <strong>Conexão com o GitHub</strong>
-    <p class="sub">Necessária só para adicionar/remover produtos pelo site. Fica salva apenas neste navegador.</p>
-    <label for="cOwner">Usuário do GitHub</label>
-    <input id="cOwner" required>
-    <label for="cRepo">Repositório</label>
-    <input id="cRepo" required>
-    <label for="cToken">Token (fine-grained, permissão Contents: read/write só neste repo)</label>
-    <input id="cToken" type="password" autocomplete="off" required>
+    <strong>Configurações</strong>
+    <label for="cKey">Chave do Serper (grátis em <a href="https://serper.dev" target="_blank" rel="noopener noreferrer">serper.dev</a>)</label>
+    <input id="cKey" type="password" autocomplete="off" placeholder="Cole aqui a chave">
+    <p class="sub">Fica salva só neste navegador, nunca vai para o GitHub.</p>
+    <label class="check"><input type="checkbox" id="cAuto"> Atualizar sozinho 1x por dia ao abrir o site</label>
+    <label>Backup (seus dados ficam só neste navegador)</label>
+    <div class="inline">
+      <button type="button" id="btnExport">Exportar</button>
+      <button type="button" id="btnImport">Importar</button>
+      <input type="file" id="fileImport" accept="application/json" hidden>
+    </div>
     <div class="actions">
       <button type="button" id="cfgCancel">Cancelar</button>
       <button class="primary" type="submit">Salvar</button>
@@ -125,195 +134,252 @@
 
 <script>
 const $ = (s) => document.querySelector(s);
-const brl = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const safeUrl = (u) => (/^https?:\/\//i.test(u) ? esc(u) : "#");
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join("/") : "—");
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
-let products = [], deals = {};
+// <pure>
+const brl = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const tokens = (s) => new Set((norm(s).match(/[a-z0-9]+/g) || []).filter((t) => t.length > 1));
+function parseBRL(txt) {
+  let s = String(txt ?? "").replace(/[^\d,.]/g, "");
+  if (!s) return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else { const dots = (s.match(/\./g) || []).length; if (dots > 1 || (dots === 1 && s.split(".")[1].length === 3)) s = s.replace(/\./g, ""); }
+  const v = parseFloat(s);
+  return v > 0 ? v : null;
+}
+const median = (a) => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+function filterShopping(name, items) {
+  const want = tokens(name);
+  const fallback = "https://www.google.com/search?tbm=shop&hl=pt-BR&gl=br&q=" + encodeURIComponent(name);
+  let c = [];
+  for (const it of items || []) {
+    const price = parseBRL(it.price), title = String(it.title || "");
+    if (!price || !title) continue;
+    if (want.size) { const have = tokens(title); let hit = 0; want.forEach((t) => { if (have.has(t)) hit++; }); if (hit / want.size < 0.6) continue; }
+    if (/\b(usad[oa]|seminov[oa]|recondicionad[oa]|open box)\b/.test(norm(title))) continue;
+    c.push({ store: String(it.source || "").slice(0, 60), title: title.slice(0, 160), price: Math.round(price * 100) / 100,
+             url: /^https?:\/\//.test(it.link || "") ? it.link : fallback, condition: "novo",
+             shipping: String(it.delivery || "").slice(0, 80), note: "" });
+  }
+  if (c.length >= 4) { const m = median(c.map((x) => x.price)); c = c.filter((x) => x.price >= 0.5 * m); }
+  const best = new Map();
+  [...c].sort((a, b) => a.price - b.price).forEach((x) => { if (!best.has(x.store)) best.set(x.store, x); });
+  const offers = [...best.values()].slice(0, 5);
+  const summary = offers.length ? `${c.length} anúncios no Google Shopping; preço mediano ${brl(median(c.map((x) => x.price)))}` : "Nenhum anúncio relevante no Google Shopping.";
+  return { offers, summary };
+}
+// </pure>
+
+// ---- armazenamento local (por navegador) ----
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { toast("Não consegui salvar no navegador (aba anônima?)."); } },
+};
+let products = store.get("cp_products", []);
+let deals = store.get("cp_deals", {});
+let settings = Object.assign({ key: "", auto: true }, store.get("cp_settings", {}));
+let busy = false, lastSearch = null;
 
 function toast(msg) {
   const t = $("#toast"); t.textContent = msg; t.style.display = "block";
-  clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = "none"), 3500);
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = "none"), 4000);
 }
 
-async function load() {
-  const bust = "?t=" + Date.now();
+// ---- busca (Serper / Google Shopping, direto do navegador) ----
+async function serperSearch(name) {
+  let res;
   try {
-    products = await (await fetch("products.json" + bust)).json();
-    deals = await (await fetch("data/deals.json" + bust)).json().catch(() => ({}));
-  } catch (e) { $("#status").textContent = "Erro ao carregar dados."; return; }
-  render();
+    res = await fetch("https://google.serper.dev/shopping", { method: "POST",
+      headers: { "X-API-KEY": settings.key, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: name, gl: "br", hl: "pt-br", num: 40 }) });
+  } catch { const e = new Error("Não consegui falar com o Serper (sem internet ou bloqueio do navegador)."); e.fatal = true; throw e; }
+  if ([401, 402, 403].includes(res.status)) { const e = new Error("Chave do Serper inválida ou sem créditos."); e.fatal = true; throw e; }
+  if (!res.ok) throw new Error("O Serper respondeu com erro " + res.status + ".");
+  const data = await res.json();
+  return filterShopping(name, data.shopping);
 }
 
+function applyResult(id, r) {
+  const e = deals[id] || { history: [] };
+  delete e.error;
+  e.updated = todayStr(); e.offers = r.offers; e.summary = r.summary;
+  if (r.offers.length) e.history = (e.history || []).filter((h) => h.d !== e.updated).concat({ d: e.updated, p: r.offers[0].price }).slice(-90);
+  deals[id] = e; store.set("cp_deals", deals);
+}
+
+function setBusy(on, label) {
+  busy = on;
+  document.querySelectorAll("#btnRun, #sBtn, [data-upd]").forEach((b) => (b.disabled = on));
+  $("#btnRun").textContent = on ? "Buscando…" : "Buscar tudo agora";
+  if (!on) render();
+}
+
+async function runList(list) {
+  if (busy) return;
+  if (!settings.key) { openSettings(); toast("Cole sua chave do Serper primeiro."); return; }
+  if (!list.length) { toast("Nenhum produto para buscar."); return; }
+  setBusy(true);
+  let ok = 0;
+  for (let i = 0; i < list.length; i++) {
+    $("#status").textContent = `Buscando ${i + 1}/${list.length}: ${list[i].name}`;
+    try { applyResult(list[i].id, await serperSearch(list[i].name)); ok++; }
+    catch (e) {
+      const en = deals[list[i].id] || { history: [] }; en.error = e.message; deals[list[i].id] = en; store.set("cp_deals", deals);
+      if (e.fatal) { toast(e.message); break; }
+    }
+  }
+  setBusy(false);
+  toast(`${ok}/${list.length} produtos atualizados.`);
+}
+
+// ---- tela ----
 function spark(hist) {
   if (!hist || hist.length < 2) return "";
   const w = 120, h = 32, ps = hist.map((x) => x.p), min = Math.min(...ps), max = Math.max(...ps), rng = max - min || 1;
   const pts = ps.map((p, i) => `${(i / (ps.length - 1)) * w},${h - 3 - ((p - min) / rng) * (h - 6)}`).join(" ");
-  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Histórico do menor preço, ${hist.length} dias">
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Histórico do menor preço, ${hist.length} buscas">
     <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
+function offersHtml(best, offers, open) {
+  return `<div><a href="${safeUrl(best.url)}" target="_blank" rel="noopener noreferrer">${esc(best.title || "Ver oferta")}</a>
+      <span class="store">· ${esc(best.store)}</span></div>
+    ${best.shipping || best.note ? `<div class="sub">${esc([best.shipping, best.note].filter(Boolean).join(" · "))}</div>` : ""}
+    ${offers.length > 1 ? `<details ${open ? "open" : ""}><summary>Outras ofertas (${offers.length - 1})</summary><table>${offers.slice(1).map((o) =>
+      `<tr><td><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.store)}</a><div class="sub">${esc(o.title)}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}`;
+}
+
 function render() {
-  const list = $("#list");
   const dates = Object.values(deals).map((d) => d.updated).filter(Boolean).sort();
   $("#status").textContent = dates.length ? "Última busca: " + fmtDate(dates[dates.length - 1]) : "Nenhuma busca feita ainda";
-  if (!products.length) { list.innerHTML = '<div class="empty">Nenhum produto. Clique em “+ Produto”.</div>'; return; }
-  list.innerHTML = products.map((p) => {
+  const banner = settings.key ? "" : `<div class="card">Para buscar preços, cole sua chave grátis do Serper em ⚙︎ (cadastro em <a href="https://serper.dev" target="_blank" rel="noopener noreferrer">serper.dev</a>, 2.500 buscas, sem cartão).</div>`;
+  if (!products.length) { $("#list").innerHTML = banner + '<div class="empty">Nenhum produto. Clique em “+ Produto”.</div>'; return; }
+  $("#list").innerHTML = banner + products.map((p) => {
     const d = deals[p.id] || {}, offers = d.offers || [], best = offers[0];
     const hist = d.history || [], prev = hist.length > 1 ? hist[hist.length - 2].p : null;
     const hit = best && p.target_price && best.price <= p.target_price;
     const lowest = best && hist.length > 1 && best.price <= Math.min(...hist.map((h) => h.p));
     let body;
     if (d.error && !best) body = `<div class="err">Falha na última busca: ${esc(d.error)}</div>`;
-    else if (!d.updated) body = '<div class="summary">Aguardando a primeira busca (roda todo dia automaticamente).</div>';
-    else if (!best) body = '<div class="summary">Nenhuma oferta confiável encontrada hoje.</div>';
+    else if (!d.updated) body = '<div class="summary">Ainda sem busca. Clique em “Buscar tudo agora”.</div>';
+    else if (!best) body = '<div class="summary">Nenhuma oferta confiável encontrada. Tente um nome mais específico.</div>';
     else {
       const delta = prev ? best.price - prev : 0;
-      body = `<div class="best">
-          <span class="price">${brl(best.price)}</span>
-          ${hit ? '<span class="badge">Abaixo do alvo</span>' : ""}
-          ${lowest ? '<span class="badge">Menor preço do histórico</span>' : ""}
-          ${delta ? `<span class="sub">${delta < 0 ? "▼" : "▲"} ${brl(Math.abs(delta))} vs. busca anterior</span>` : ""}
-        </div>
-        <div><a href="${safeUrl(best.url)}" target="_blank" rel="noopener noreferrer">${esc(best.title || "Ver oferta")}</a>
-          <span class="store">· ${esc(best.store)}${best.condition && best.condition !== "novo" ? " · " + esc(best.condition) : ""}</span></div>
-        ${best.shipping || best.note ? `<div class="sub">${esc([best.shipping, best.note].filter(Boolean).join(" · "))}</div>` : ""}
-        ${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}
-        ${offers.length > 1 ? `<details><summary>Outras ofertas (${offers.length - 1})</summary><table>${offers.slice(1).map((o) =>
-          `<tr><td><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.store)}</a><div class="sub">${esc(o.title)}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}`;
+      body = `<div class="best"><span class="price">${brl(best.price)}</span>
+          ${hit ? '<span class="badge">Abaixo do alvo</span>' : ""}${lowest ? '<span class="badge">Menor preço do histórico</span>' : ""}
+          ${delta ? `<span class="sub">${delta < 0 ? "▼" : "▲"} ${brl(Math.abs(delta))} vs. busca anterior</span>` : ""}</div>
+        ${offersHtml(best, offers, false)}${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}
+        ${d.error ? `<div class="err">Última tentativa falhou: ${esc(d.error)}</div>` : ""}`;
     }
     return `<article class="card">
       <div class="row"><div><div class="name">${esc(p.name)}</div>${p.notes ? `<div class="notes">${esc(p.notes)}</div>` : ""}</div>${spark(hist)}</div>
       ${body}
       <div class="meta"><span>${p.target_price ? "Alvo: " + brl(p.target_price) : "Sem preço-alvo"} · Atualizado: ${fmtDate(d.updated)}</span>
-        <button class="link" data-del="${esc(p.id)}">Remover</button></div>
+        <span><button class="link" data-upd="${esc(p.id)}" ${busy ? "disabled" : ""}>Atualizar</button>
+        <button class="link del" data-del="${esc(p.id)}">Remover</button></span></div>
     </article>`;
   }).join("");
 }
 
-// ---- GitHub: grava products.json no repositório ----
-const cfg = () => { try { return JSON.parse(localStorage.getItem("ghcfg")) || null; } catch { return null; } };
-const b64 = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+function addProduct(p) { products = [...products, p]; store.set("cp_products", products); }
+const makeId = (name) => name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) + "-" + Date.now().toString(36);
 
-async function saveProducts(next, message) {
-  const c = cfg();
-  if (!c) { $("#dlgCfg").showModal(); throw new Error("Configure o GitHub primeiro (botão ⚙︎)."); }
-  const url = `https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/contents/products.json`;
-  const headers = { Authorization: `Bearer ${c.token}`, Accept: "application/vnd.github+json" };
-  const cur = await fetch(url, { headers });
-  if (!cur.ok) throw new Error("Não consegui ler o repositório (" + cur.status + "). Confira o token.");
-  const { sha } = await cur.json();
-  const res = await fetch(url, { method: "PUT", headers,
-    body: JSON.stringify({ message, sha, content: b64(JSON.stringify(next, null, 2) + "\n") }) });
-  if (!res.ok) throw new Error("Falha ao salvar (" + res.status + ").");
-  products = next; render();
-}
+$("#list").onclick = (e) => {
+  const upd = e.target.dataset?.upd, del = e.target.dataset?.del;
+  if (upd) runList(products.filter((p) => p.id === upd));
+  if (del) {
+    const p = products.find((x) => x.id === del);
+    if (!confirm(`Remover “${p.name}”?`)) return;
+    products = products.filter((x) => x.id !== del); delete deals[del];
+    store.set("cp_products", products); store.set("cp_deals", deals); render();
+  }
+};
 
+// ---- adicionar produto ----
 $("#btnAdd").onclick = () => $("#dlgAdd").showModal();
 $("#addCancel").onclick = () => $("#dlgAdd").close();
-$("#btnCfg").onclick = () => {
-  const c = cfg() || {};
-  $("#cOwner").value = c.owner || ""; $("#cRepo").value = c.repo || ""; $("#cToken").value = c.token || "";
-  $("#dlgCfg").showModal();
+$("#formAdd").onsubmit = () => {
+  const name = $("#fName").value.trim(), target = parseFloat($("#fTarget").value);
+  const p = { id: makeId(name), name, notes: $("#fNotes").value.trim() || undefined, target_price: target > 0 ? target : undefined };
+  addProduct(p); $("#formAdd").reset(); render(); showTab("watch");
+  runList([p]);
 };
+$("#btnRun").onclick = () => runList(products);
+
+// ---- configurações ----
+function openSettings() { $("#cKey").value = settings.key; $("#cAuto").checked = settings.auto; $("#dlgCfg").showModal(); }
+$("#btnCfg").onclick = openSettings;
 $("#cfgCancel").onclick = () => $("#dlgCfg").close();
 $("#formCfg").onsubmit = () => {
-  localStorage.setItem("ghcfg", JSON.stringify({ owner: $("#cOwner").value.trim(), repo: $("#cRepo").value.trim(), token: $("#cToken").value.trim() }));
-  toast("Conexão salva neste navegador.");
+  settings = { key: $("#cKey").value.trim(), auto: $("#cAuto").checked };
+  store.set("cp_settings", settings); render(); toast("Configurações salvas.");
 };
-$("#formAdd").onsubmit = async () => {
-  const name = $("#fName").value.trim();
-  const target = parseFloat($("#fTarget").value);
-  const p = { id: name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) + "-" + Date.now().toString(36),
-              name, notes: $("#fNotes").value.trim() || undefined, target_price: target > 0 ? target : undefined };
-  try { await saveProducts([...products, p], "Adiciona produto: " + name); toast("Adicionado. A busca roda em alguns minutos."); $("#formAdd").reset(); }
-  catch (e) { toast(e.message); }
+$("#btnExport").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ products, deals }, null, 2)], { type: "application/json" }));
+  a.download = "cacapromo-backup.json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
-$("#list").onclick = async (e) => {
-  const id = e.target.dataset?.del; if (!id) return;
-  const p = products.find((x) => x.id === id);
-  if (!confirm(`Remover “${p.name}”?`)) return;
-  try { await saveProducts(products.filter((x) => x.id !== id), "Remove produto: " + p.name); toast("Removido."); }
-  catch (err) { toast(err.message); }
+$("#btnImport").onclick = () => $("#fileImport").click();
+$("#fileImport").onchange = async (e) => {
+  try {
+    const d = JSON.parse(await e.target.files[0].text());
+    if (!Array.isArray(d.products) || !d.products.every((p) => typeof p.id === "string" && typeof p.name === "string") || typeof d.deals !== "object") throw 0;
+    products = d.products; deals = d.deals; store.set("cp_products", products); store.set("cp_deals", deals);
+    render(); toast("Backup importado."); $("#dlgCfg").close();
+  } catch { toast("Arquivo de backup inválido."); }
+  e.target.value = "";
 };
 
-// ---- Aba Pesquisar (pesquisa sob demanda via GitHub Actions) ----
+// ---- aba Pesquisar ----
 function showTab(name) {
   document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", t.dataset.tab === name));
-  $("#list").hidden = name !== "watch";
-  $("#pane-search").hidden = name !== "search";
+  $("#list").hidden = name !== "watch"; $("#pane-search").hidden = name !== "search";
 }
 document.querySelector(".tabs").onclick = (e) => { const t = e.target.dataset?.tab; if (t) showTab(t); };
 
-const ghHeaders = (c, accept = "application/vnd.github+json") => ({ Authorization: `Bearer ${c.token}`, Accept: accept });
-const repoApi = (c) => `https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}`;
-let pollTimer = null, lastSearch = null;
-
-function showResult(d) {
-  $("#sBtn").disabled = false;
-  const box = $("#sResult");
-  if (d.status === "error") { box.innerHTML = `<div class="card err">A pesquisa falhou: ${esc(d.error)}</div>`; return; }
-  const offers = d.offers || [], best = offers[0];
-  if (!best) { box.innerHTML = `<div class="card">Nenhuma oferta confiável encontrada para “${esc(d.query)}”.${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}</div>`; return; }
-  lastSearch = d;
-  const tracked = products.some((p) => p.name.toLowerCase() === d.query.toLowerCase());
+function showResult(q, r) {
+  const box = $("#sResult"), offers = r.offers, best = offers[0];
+  if (!best) { lastSearch = null; box.innerHTML = `<div class="card">Nenhuma oferta confiável para “${esc(q)}”. Tente um nome mais específico.</div>`; return; }
+  lastSearch = { q, r };
+  const tracked = products.some((p) => p.name.toLowerCase() === q.toLowerCase());
   box.innerHTML = `<article class="card">
-    <div class="name">${esc(d.query)}</div>
+    <div class="name">${esc(q)}</div>
     <div class="best"><span class="price">${brl(best.price)}</span><span class="badge">Menor preço encontrado</span></div>
-    <div><a href="${safeUrl(best.url)}" target="_blank" rel="noopener noreferrer">${esc(best.title || "Ver oferta")}</a>
-      <span class="store">· ${esc(best.store)}${best.condition && best.condition !== "novo" ? " · " + esc(best.condition) : ""}</span></div>
-    ${best.shipping || best.note ? `<div class="sub">${esc([best.shipping, best.note].filter(Boolean).join(" · "))}</div>` : ""}
-    ${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}
-    ${offers.length > 1 ? `<details open><summary>Outras ofertas (${offers.length - 1})</summary><table>${offers.slice(1).map((o) =>
-      `<tr><td><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.store)}</a><div class="sub">${esc(o.title)}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}
-    <div class="meta"><span>Pesquisado em ${fmtDate(d.date)}</span>
-      <button id="btnTrack" ${tracked ? "disabled" : ""}>${tracked ? "Já acompanhando" : "+ Acompanhar todo dia"}</button></div>
+    ${offersHtml(best, offers, true)}${r.summary ? `<div class="summary">${esc(r.summary)}</div>` : ""}
+    <div class="meta"><span>Pesquisado agora</span>
+      <button id="btnTrack" ${tracked ? "disabled" : ""}>${tracked ? "Já acompanhando" : "+ Acompanhar"}</button></div>
   </article>`;
 }
 
-async function runSearch(q) {
-  const c = cfg(), box = $("#sResult");
-  if (!c) { $("#dlgCfg").showModal(); toast("Configure o GitHub primeiro (botão ⚙︎)."); return; }
-  clearTimeout(pollTimer);
-  const id = Date.now().toString(36), btn = $("#sBtn");
-  btn.disabled = true;
-  box.innerHTML = `<div class="card"><span class="spin"></span>Pesquisando “${esc(q)}”… leva de 1 a 3 minutos.</div>`;
-  const fail = (msg) => { btn.disabled = false; box.innerHTML = `<div class="card err">${esc(msg)}</div>`; };
-  try {
-    const repoRes = await fetch(repoApi(c), { headers: ghHeaders(c) });
-    if (!repoRes.ok) return fail("Não consegui acessar o repositório (" + repoRes.status + "). Confira ⚙︎.");
-    const { default_branch } = await repoRes.json();
-    const disp = await fetch(`${repoApi(c)}/actions/workflows/search.yml/dispatches`, {
-      method: "POST", headers: ghHeaders(c),
-      body: JSON.stringify({ ref: default_branch, inputs: { query: q, request_id: id } }) });
-    if (!disp.ok) return fail(disp.status === 403 || disp.status === 404
-      ? "O token precisa da permissão Actions: Read and write neste repositório (e o arquivo search.yml precisa estar no GitHub)."
-      : "Não consegui iniciar a pesquisa (" + disp.status + ").");
-  } catch { return fail("Sem conexão com o GitHub."); }
-
-  const t0 = Date.now();
-  const poll = async () => {
-    try {
-      const r = await fetch(`${repoApi(c)}/contents/data/search.json?t=${Date.now()}`, { headers: ghHeaders(c, "application/vnd.github.raw+json") });
-      if (r.ok) { const d = await r.json(); if (d.id === id) return showResult(d); }
-    } catch { /* tenta de novo */ }
-    if (Date.now() - t0 > 5 * 60000) return fail("Demorou demais. Veja a aba Actions do repositório para o motivo.");
-    pollTimer = setTimeout(poll, 8000);
-  };
-  pollTimer = setTimeout(poll, 20000);
-}
-
-$("#formSearch").onsubmit = (e) => { e.preventDefault(); runSearch($("#sQuery").value.trim()); };
-$("#sResult").onclick = async (e) => {
-  if (e.target.id !== "btnTrack" || !lastSearch) return;
-  const name = lastSearch.query;
-  const id = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) + "-" + Date.now().toString(36);
-  try { await saveProducts([...products, { id, name }], "Adiciona produto: " + name); toast("Adicionado à lista."); e.target.textContent = "Já acompanhando"; e.target.disabled = true; }
-  catch (err) { toast(err.message); }
+$("#formSearch").onsubmit = async (e) => {
+  e.preventDefault();
+  if (busy) return;
+  if (!settings.key) { openSettings(); toast("Cole sua chave do Serper primeiro."); return; }
+  const q = $("#sQuery").value.trim(), box = $("#sResult");
+  setBusy(true);
+  box.innerHTML = `<div class="card"><span class="spin"></span>Pesquisando “${esc(q)}”…</div>`;
+  try { showResult(q, await serperSearch(q)); }
+  catch (err) { box.innerHTML = `<div class="card err">${esc(err.message)}</div>`; }
+  setBusy(false);
 };
 
-load();
+$("#sResult").onclick = (e) => {
+  if (e.target.id !== "btnTrack" || !lastSearch) return;
+  const p = { id: makeId(lastSearch.q), name: lastSearch.q };
+  addProduct(p); applyResult(p.id, lastSearch.r); render();
+  e.target.textContent = "Já acompanhando"; e.target.disabled = true; toast("Adicionado à lista.");
+};
+
+// ---- início ----
+render();
+if (settings.key && settings.auto && products.length) {
+  const stale = products.filter((p) => deals[p.id]?.updated !== todayStr());
+  if (stale.length) runList(stale);
+}
 </script>
 </body>
 </html>
