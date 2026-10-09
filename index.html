@@ -55,7 +55,7 @@
           border-radius: 50%; animation: sp 1s linear infinite; vertical-align: -2px; margin-right: 8px; }
   @keyframes sp { to { transform: rotate(360deg); } }
   [hidden] { display: none !important; }
-  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); width: min(460px, 92vw); padding: 18px; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); width: min(460px, 92vw); padding: 18px; max-height: 90vh; overflow: auto; }
   dialog::backdrop { background: rgba(0,0,0,.5); }
   label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
   label.check { display: flex; gap: 8px; align-items: center; color: var(--text); }
@@ -118,6 +118,13 @@
     <input id="cKey" type="password" autocomplete="off" placeholder="Cole aqui a chave">
     <p class="sub">Fica salva só neste navegador, nunca vai para o GitHub.</p>
     <label class="check"><input type="checkbox" id="cAuto"> Atualizar sozinho 1x por dia ao abrir o site</label>
+    <label class="check"><input type="checkbox" id="cTrustedOnly"> Só mostrar lojas confiáveis</label>
+    <label for="cTrusted">Lojas confiáveis (uma por linha)</label>
+    <textarea id="cTrusted" rows="6"></textarea>
+    <div class="inline"><button type="button" id="btnTrustedReset">Restaurar lista padrão</button></div>
+    <label for="cMinRating">Nota mínima do produto (0 a 5; 0 = ignorar)</label>
+    <input id="cMinRating" type="number" min="0" max="5" step="0.1">
+    <label class="check"><input type="checkbox" id="cReqRating"> Descartar produtos sem avaliação</label>
     <label>Backup (seus dados ficam só neste navegador)</label>
     <div class="inline">
       <button type="button" id="btnExport">Exportar</button>
@@ -152,7 +159,12 @@ function parseBRL(txt) {
   return v > 0 ? v : null;
 }
 const median = (a) => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-function filterShopping(name, items) {
+const DEFAULT_TRUSTED = ["Amazon", "Mercado Livre", "Magazine Luiza", "Magalu", "Americanas", "Submarino", "Shoptime",
+  "Casas Bahia", "Ponto", "Carrefour", "Fast Shop", "Kabum", "Pichau", "Terabyte", "Girafa", "Kalunga",
+  "Samsung", "Dell", "Lenovo", "LG", "Apple", "Havan", "Leroy Merlin", "Decathlon", "Netshoes", "Centauro"];
+const squash = (s) => norm(s).replace(/[^a-z0-9]/g, "");
+const isTrusted = (source, list) => { const n = squash(source); return list.some((t) => { const k = squash(t); return k && n.startsWith(k); }); };
+function filterShopping(name, items, opts = {}) {
   const want = tokens(name);
   const fallback = "https://www.google.com/search?tbm=shop&hl=pt-BR&gl=br&q=" + encodeURIComponent(name);
   let c = [];
@@ -163,13 +175,25 @@ function filterShopping(name, items) {
     if (/\b(usad[oa]|seminov[oa]|recondicionad[oa]|open box)\b/.test(norm(title))) continue;
     c.push({ store: String(it.source || "").slice(0, 60), title: title.slice(0, 160), price: Math.round(price * 100) / 100,
              url: /^https?:\/\//.test(it.link || "") ? it.link : fallback, condition: "novo",
-             shipping: String(it.delivery || "").slice(0, 80), note: "" });
+             shipping: String(it.delivery || "").slice(0, 80), note: "",
+             rating: parseFloat(it.rating) || null, ratingCount: /mil/i.test(String(it.ratingCount)) ? Math.round(parseFloat(String(it.ratingCount).replace(",", ".")) * 1000) || 0 : parseInt(String(it.ratingCount ?? "").replace(/\D/g, "")) || 0 });
   }
   if (c.length >= 4) { const m = median(c.map((x) => x.price)); c = c.filter((x) => x.price >= 0.5 * m); }
+  const total = c.length;
+  const useTrust = !!(opts.trusted && opts.trusted.length);
+  if (useTrust) c = c.filter((x) => isTrusted(x.store, opts.trusted));
+  if (opts.minRating > 0) c = c.filter((x) => {
+    const has = x.rating && (x.ratingCount === 0 || x.ratingCount >= 3);  // nota com 1-2 avaliações não conta
+    return has ? x.rating >= opts.minRating : !opts.requireRating;
+  });
   const best = new Map();
   [...c].sort((a, b) => a.price - b.price).forEach((x) => { if (!best.has(x.store)) best.set(x.store, x); });
   const offers = [...best.values()].slice(0, 5);
-  const summary = offers.length ? `${c.length} anúncios no Google Shopping; preço mediano ${brl(median(c.map((x) => x.price)))}` : "Nenhum anúncio relevante no Google Shopping.";
+  const filtered = useTrust || opts.minRating > 0;
+  let summary;
+  if (offers.length) summary = filtered ? `${c.length} de ${total} anúncios passaram no filtro de lojas e avaliação; preço mediano ${brl(median(c.map((x) => x.price)))}`
+                                        : `${c.length} anúncios no Google Shopping; preço mediano ${brl(median(c.map((x) => x.price)))}`;
+  else summary = total ? `Havia ${total} anúncios, mas nenhum de loja confiável ou com boa avaliação.` : "Nenhum anúncio relevante no Google Shopping.";
   return { offers, summary };
 }
 // </pure>
@@ -181,7 +205,7 @@ const store = {
 };
 let products = store.get("cp_products", []);
 let deals = store.get("cp_deals", {});
-let settings = Object.assign({ key: "", auto: true }, store.get("cp_settings", {}));
+let settings = Object.assign({ key: "", auto: true, trustedOnly: true, trusted: DEFAULT_TRUSTED, minRating: 4, requireRating: false }, store.get("cp_settings", {}));
 let busy = false, lastSearch = null;
 
 function toast(msg) {
@@ -200,7 +224,7 @@ async function serperSearch(name) {
   if ([401, 402, 403].includes(res.status)) { const e = new Error("Chave do Serper inválida ou sem créditos."); e.fatal = true; throw e; }
   if (!res.ok) throw new Error("O Serper respondeu com erro " + res.status + ".");
   const data = await res.json();
-  return filterShopping(name, data.shopping);
+  return filterShopping(name, data.shopping, { trusted: settings.trustedOnly ? settings.trusted : null, minRating: settings.minRating, requireRating: settings.requireRating });
 }
 
 function applyResult(id, r) {
@@ -245,12 +269,13 @@ function spark(hist) {
     <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
+const rate = (o) => (o.rating ? ` · ★ ${String(o.rating).replace(".", ",")}${o.ratingCount ? ` (${o.ratingCount})` : ""}` : "");
 function offersHtml(best, offers, open) {
   return `<div><a href="${safeUrl(best.url)}" target="_blank" rel="noopener noreferrer">${esc(best.title || "Ver oferta")}</a>
-      <span class="store">· ${esc(best.store)}</span></div>
+      <span class="store">· ${esc(best.store)}${esc(rate(best))}</span></div>
     ${best.shipping || best.note ? `<div class="sub">${esc([best.shipping, best.note].filter(Boolean).join(" · "))}</div>` : ""}
     ${offers.length > 1 ? `<details ${open ? "open" : ""}><summary>Outras ofertas (${offers.length - 1})</summary><table>${offers.slice(1).map((o) =>
-      `<tr><td><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.store)}</a><div class="sub">${esc(o.title)}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}`;
+      `<tr><td><a href="${safeUrl(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.store)}</a><div class="sub">${esc(o.title)}${esc(rate(o))}</div></td><td class="p">${brl(o.price)}</td></tr>`).join("")}</table></details>` : ""}`;
 }
 
 function render() {
@@ -311,11 +336,19 @@ $("#formAdd").onsubmit = () => {
 $("#btnRun").onclick = () => runList(products);
 
 // ---- configurações ----
-function openSettings() { $("#cKey").value = settings.key; $("#cAuto").checked = settings.auto; $("#dlgCfg").showModal(); }
+function openSettings() {
+  $("#cKey").value = settings.key; $("#cAuto").checked = settings.auto;
+  $("#cTrustedOnly").checked = settings.trustedOnly; $("#cTrusted").value = settings.trusted.join("\n");
+  $("#cMinRating").value = settings.minRating; $("#cReqRating").checked = settings.requireRating;
+  $("#dlgCfg").showModal();
+}
+$("#btnTrustedReset").onclick = () => { $("#cTrusted").value = DEFAULT_TRUSTED.join("\n"); };
 $("#btnCfg").onclick = openSettings;
 $("#cfgCancel").onclick = () => $("#dlgCfg").close();
 $("#formCfg").onsubmit = () => {
-  settings = { key: $("#cKey").value.trim(), auto: $("#cAuto").checked };
+  settings = { key: $("#cKey").value.trim(), auto: $("#cAuto").checked, trustedOnly: $("#cTrustedOnly").checked,
+    trusted: $("#cTrusted").value.split("\n").map((x) => x.trim()).filter(Boolean),
+    minRating: Math.min(5, Math.max(0, parseFloat($("#cMinRating").value) || 0)), requireRating: $("#cReqRating").checked };
   store.set("cp_settings", settings); render(); toast("Configurações salvas.");
 };
 $("#btnExport").onclick = () => {
